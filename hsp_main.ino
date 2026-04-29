@@ -112,7 +112,7 @@ static SettingsPage settingsPage = SettingsPage::AutoShutoff;
 
 // Buzzer: M5.Speaker.setVolume(0–255) + tone(hz, ms) — see M5Unified Speaker class docs.
 static constexpr uint8_t TONE_LEVEL_COUNT = 5;
-static const uint8_t kToneVolumeLevels[TONE_LEVEL_COUNT] = {35, 75, 128, 190, 245};
+static const uint8_t kToneVolumeLevels[TONE_LEVEL_COUNT] = {0, 75, 128, 190, 245};
 static uint8_t toneVolumeIndex = 2;
 
 static const float kTonePitchHz[TONE_LEVEL_COUNT] = {2600.f, 3300.f, 4000.f, 4700.f, 5400.f};
@@ -208,6 +208,12 @@ static void saveAllSettings() {
 
 static void applySpeakerVolumeFromConfig() { M5.Speaker.setVolume(kToneVolumeLevels[toneVolumeIndex]); }
 
+static void playToneIfAudible(float hz, uint32_t ms) {
+  applySpeakerVolumeFromConfig();
+  if (kToneVolumeLevels[toneVolumeIndex] == 0) return;
+  M5.Speaker.tone(hz, ms);
+}
+
 static float currentToneHz() { return kTonePitchHz[tonePitchIndex]; }
 
 static uint32_t currentToneMs() { return kToneDurationMs[toneDurationIndex]; }
@@ -265,10 +271,7 @@ static SettingsPage nextSettingsPage(SettingsPage p) {
   return static_cast<SettingsPage>(n);
 }
 
-static void playConfigPreviewTone() {
-  applySpeakerVolumeFromConfig();
-  M5.Speaker.tone(currentToneHz(), currentToneMs());
-}
+static void playConfigPreviewTone() { playToneIfAudible(currentToneHz(), currentToneMs()); }
 
 static void fillSettingsValueString(char* buf, size_t bufLen) {
   switch (settingsPage) {
@@ -276,8 +279,12 @@ static void fillSettingsValueString(char* buf, size_t bufLen) {
       snprintf(buf, bufLen, "%s", autoShutoffLabel(autoShutoff));
       break;
     case SettingsPage::ToneVolume:
-      snprintf(buf, bufLen, "Level %u  (%u)", static_cast<unsigned>(toneVolumeIndex + 1),
-               static_cast<unsigned>(kToneVolumeLevels[toneVolumeIndex]));
+      if (toneVolumeIndex == 0) {
+        snprintf(buf, bufLen, "Off");
+      } else {
+        snprintf(buf, bufLen, "Level %u  (%u)", static_cast<unsigned>(toneVolumeIndex),
+                 static_cast<unsigned>(kToneVolumeLevels[toneVolumeIndex]));
+      }
       break;
     case SettingsPage::TonePitch:
       snprintf(buf, bufLen, "%.0f Hz", static_cast<double>(kTonePitchHz[tonePitchIndex]));
@@ -581,14 +588,10 @@ static void powerDown() {
 }
 
 // ---------- Beeps ----------
-static void beepSplit() {
-  applySpeakerVolumeFromConfig();
-  M5.Speaker.tone(currentToneHz(), currentToneMs());
-}
+static void beepSplit() { playToneIfAudible(currentToneHz(), currentToneMs()); }
 
 static void beepPowerOff() {
-  applySpeakerVolumeFromConfig();
-  M5.Speaker.tone(currentToneHz() * 0.55f, currentToneMs() * 2);
+  playToneIfAudible(currentToneHz() * 0.55f, currentToneMs() * 2);
 }
 
 static void beepConfigStep() {
